@@ -1,14 +1,22 @@
 // firebase.js
 import admin from "firebase-admin";
 import dotenv from "dotenv";
-import fs from "fs";
-import path from "path";
 
 dotenv.config();
 
-// Ruta al archivo JSON del Service Account
-const serviceAccountPath = process.env.FIREBASE_SERVICE_ACCOUNT_PATH || "./serviceAccountKey.json";
-const serviceAccount = JSON.parse(fs.readFileSync(path.resolve(serviceAccountPath), "utf8"));
+// ✅ Si guardaste el JSON entero en una sola variable
+let serviceAccount;
+
+if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+  serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+
+  // Arreglar los saltos de línea de la private key
+  if (serviceAccount.private_key) {
+    serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, "\n");
+  }
+} else {
+  throw new Error("FIREBASE_SERVICE_ACCOUNT no está definido en las variables de entorno");
+}
 
 // Inicializar Firebase Admin
 admin.initializeApp({
