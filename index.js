@@ -1,8 +1,18 @@
 import puppeteer from "puppeteer";
 import { guardarProductos } from "./dbFunctions.js";
 
+const isGithub = process.env.GITHUB_ACTIONS === "true";
+
+// Función helper para lanzar browser
+async function launchBrowser() {
+  return await puppeteer.launch({
+    headless: isGithub ? true : false,
+    args: isGithub ? ["--no-sandbox", "--disable-setuid-sandbox"] : []
+  });
+}
+
 async function scrapearProductos() {
-  const browser = await puppeteer.launch({ headless: false });
+  const browser = await launchBrowser();
   const page = await browser.newPage();
 
   await page.goto(
@@ -15,7 +25,6 @@ async function scrapearProductos() {
   const productos = await page.evaluate(() => {
     const nombres = document.querySelectorAll('.nombre-producto.cursor-pointer');
     const precios = document.querySelectorAll('.card-title.text-center.mt-1.m-0.p-0.ng-star-inserted');
-
     const resultados = [];
     for (let i = 0; i < nombres.length; i++) {
       const nombre = nombres[i]?.innerText.trim() || '';
@@ -50,14 +59,12 @@ async function autoScroll(page) {
 }
 
 async function scrapearJumbo() {
-  const browser = await puppeteer.launch({ headless: false });
+  const browser = await launchBrowser();
   const page = await browser.newPage();
 
-  await page.goto('https://www.jumbo.com.ar/', {
-    waitUntil: 'networkidle2'
-  });
+  await page.goto('https://www.jumbo.com.ar/', { waitUntil: 'networkidle2' });
 
-  // Aceptar cookies si aparece
+  // Aceptar cookies
   try {
     await page.waitForSelector('button#onetrust-accept-btn-handler', { timeout: 15000 });
     await page.click('button#onetrust-accept-btn-handler');
@@ -67,21 +74,14 @@ async function scrapearJumbo() {
   }
 
   const productos = [];
-
   let hayMasPaginas = true;
+
   while (hayMasPaginas) {
-    // Esperar que carguen productos
     await page.waitForSelector('.vtex-product-summary-2-x-productBrand', { timeout: 30000 });
 
-    // Extraer productos de la página actual
     const productosPagina = await page.evaluate(() => {
-      const nombres = document.querySelectorAll(
-        '.vtex-product-summary-2-x-productBrand'
-      );
-      const precios = document.querySelectorAll(
-        '.vtex-product-price-1-x-sellingPriceValue, .jumboargentinaio-store-theme-1dCOMij_MzTzZOCohX1K7w.vtex-price-format-gallery'
-      );
-
+      const nombres = document.querySelectorAll('.vtex-product-summary-2-x-productBrand');
+      const precios = document.querySelectorAll('.vtex-product-price-1-x-sellingPriceValue, .jumboargentinaio-store-theme-1dCOMij_MzTzZOCohX1K7w.vtex-price-format-gallery');
       const resultados = [];
       for (let i = 0; i < nombres.length; i++) {
         const nombre = nombres[i]?.innerText.trim() || '';
@@ -93,12 +93,12 @@ async function scrapearJumbo() {
 
     productos.push(...productosPagina);
 
-    // Intentar pasar a la siguiente página
+    // Pasar a la siguiente página
     try {
       await page.waitForSelector('#nav-thin-caret--right', { timeout: 5000 });
       await page.click('#nav-thin-caret--right');
       console.log("Pasando a la siguiente página...");
-      await page.waitForTimeout(3000); // esperar carga
+      await page.waitForTimeout(3000);
     } catch (e) {
       console.log("No hay más páginas");
       hayMasPaginas = false;
@@ -110,8 +110,6 @@ async function scrapearJumbo() {
 
   await browser.close();
 }
-
-
 
 // Ejecutar en orden
 async function main() {
