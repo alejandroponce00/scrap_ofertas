@@ -10,7 +10,7 @@ async function scrapearProductos() {
     { waitUntil: 'networkidle2' }
   );
 
-  await page.waitForSelector('.nombre-producto.cursor-pointer', { timeout: 60000 });
+  await page.waitForSelector('.nombre-producto.cursor-pointer', { timeout: 150000 });
 
   const productos = await page.evaluate(() => {
     const nombres = document.querySelectorAll('.nombre-producto.cursor-pointer');
@@ -49,49 +49,73 @@ async function autoScroll(page) {
   });
 }
 
-async function scrapearCarrefour() {
+async function scrapearJumbo() {
   const browser = await puppeteer.launch({ headless: false });
   const page = await browser.newPage();
 
-  await page.goto('https://www.carrefour.com.ar/21743?map=productClusterIds', {
+  await page.goto('https://www.jumbo.com.ar/', {
     waitUntil: 'networkidle2'
   });
 
+  // Aceptar cookies si aparece
   try {
-    await page.waitForSelector('button#onetrust-accept-btn-handler', { timeout: 5000 });
+    await page.waitForSelector('button#onetrust-accept-btn-handler', { timeout: 15000 });
     await page.click('button#onetrust-accept-btn-handler');
     console.log("Cookies aceptadas");
   } catch (e) {
     console.log("No se encontró el banner de cookies");
   }
 
-  console.log("Haciendo scroll para cargar todos los productos...");
-  await autoScroll(page);
+  const productos = [];
 
-  await page.waitForSelector('.vtex-product-summary-2-x-productBrand.vtex-product-summary-2-x-brandName.t-body', { timeout: 30000 });
+  let hayMasPaginas = true;
+  while (hayMasPaginas) {
+    // Esperar que carguen productos
+    await page.waitForSelector('.vtex-product-summary-2-x-productBrand', { timeout: 30000 });
 
-  const productos = await page.evaluate(() => {
-    const nombres = document.querySelectorAll('.vtex-product-summary-2-x-productBrand.vtex-product-summary-2-x-brandName.t-body');
-    const precios = document.querySelectorAll('.valtech-carrefourar-product-price-0-x-sellingPrice.valtech-carrefourar-product-price-0-x-sellingPrice--hasListPrice');
+    // Extraer productos de la página actual
+    const productosPagina = await page.evaluate(() => {
+      const nombres = document.querySelectorAll(
+        '.vtex-product-summary-2-x-productBrand'
+      );
+      const precios = document.querySelectorAll(
+        '.vtex-product-price-1-x-sellingPriceValue, .jumboargentinaio-store-theme-1dCOMij_MzTzZOCohX1K7w.vtex-price-format-gallery'
+      );
 
-    const resultados = [];
-    for (let i = 0; i < nombres.length; i++) {
-      const nombre = nombres[i]?.innerText.trim() || '';
-      const precio = precios[i]?.innerText.trim() || '';
-      if (nombre) resultados.push({ nombre, precio });
+      const resultados = [];
+      for (let i = 0; i < nombres.length; i++) {
+        const nombre = nombres[i]?.innerText.trim() || '';
+        const precio = precios[i]?.innerText.trim() || '';
+        if (nombre) resultados.push({ nombre, precio });
+      }
+      return resultados;
+    });
+
+    productos.push(...productosPagina);
+
+    // Intentar pasar a la siguiente página
+    try {
+      await page.waitForSelector('#nav-thin-caret--right', { timeout: 5000 });
+      await page.click('#nav-thin-caret--right');
+      console.log("Pasando a la siguiente página...");
+      await page.waitForTimeout(3000); // esperar carga
+    } catch (e) {
+      console.log("No hay más páginas");
+      hayMasPaginas = false;
     }
-    return resultados;
-  });
+  }
 
-  console.log(`Se encontraron ${productos.length} productos en Carrefour`);
-  await guardarProductos("Carrefour", productos);
+  console.log(`Se encontraron ${productos.length} productos en Jumbo`);
+  await guardarProductos("Jumbo", productos);
 
   await browser.close();
 }
 
+
+
 // Ejecutar en orden
 async function main() {
-  await scrapearCarrefour();
+  await scrapearJumbo();
   await scrapearProductos();
 }
 
