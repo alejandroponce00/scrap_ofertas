@@ -23,7 +23,7 @@ async function scrapearProductos() {
   await page.waitForSelector('.nombre-producto.cursor-pointer', { timeout: 150000 });
 
   const productos = await page.evaluate(() => {
-    const nombres = document.querySelectorAll('.nombre-producto.cursor-pointer');
+    const nombres = document.querySelectorAll('nombre-producto cursor-pointer');
     const precios = document.querySelectorAll('.card-title.text-center.mt-1.m-0.p-0.ng-star-inserted');
     const resultados = [];
     for (let i = 0; i < nombres.length; i++) {
