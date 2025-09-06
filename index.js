@@ -78,18 +78,19 @@ async function scrapearJumbo() {
   let hayMasPaginas = true;
 
   while (hayMasPaginas) {
-    await page.waitForSelector('.vtex-product-summary-2-x-productBrand', { timeout: 30000 });
+    // Esperamos a que carguen las tarjetas de productos
+    await page.waitForSelector('.vtex-flex-layout-0-x-flexRow--shelf-main-hover-actions', { timeout: 30000 });
 
+    // Extraemos nombre, precio e imagen desde cada tarjeta
     const productosPagina = await page.evaluate(() => {
-      const nombres = document.querySelectorAll('.vtex-product-summary-2-x-productBrand');
-      const precios = document.querySelectorAll('.vtex-product-price-1-x-sellingPriceValue, .jumboargentinaio-store-theme-1dCOMij_MzTzZOCohX1K7w.vtex-price-format-gallery');
-      const resultados = [];
-      for (let i = 0; i < nombres.length; i++) {
-        const nombre = nombres[i]?.innerText.trim() || '';
-        const precio = precios[i]?.innerText.trim() || '';
-        if (nombre) resultados.push({ nombre, precio });
-      }
-      return resultados;
+      return Array.from(document.querySelectorAll('.vtex-flex-layout-0-x-flexRow--shelf-main-hover-actions'))
+        .map(card => {
+          const nombre = card.querySelector('.vtex-product-summary-2-x-productBrand')?.innerText.trim() || '';
+          const precio = card.querySelector('.vtex-product-price-1-x-sellingPriceValue')?.innerText.trim() || '';
+          const imagen = card.querySelector('img')?.src || '';
+          return { nombre, precio, imagen };
+        })
+        .filter(p => p.nombre); // eliminamos productos sin nombre
     });
 
     productos.push(...productosPagina);
@@ -99,7 +100,7 @@ async function scrapearJumbo() {
       await page.waitForSelector('#nav-thin-caret--right', { timeout: 5000 });
       await page.click('#nav-thin-caret--right');
       console.log("Pasando a la siguiente página...");
-      await page.waitForTimeout(3000);
+      await page.waitForTimeout(3000); // esperar que cargue la siguiente página
     } catch (e) {
       console.log("No hay más páginas");
       hayMasPaginas = false;
