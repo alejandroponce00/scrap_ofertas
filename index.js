@@ -62,15 +62,16 @@ async function scrapearJumbo() {
     await page.waitForSelector('.vtex-flex-layout-0-x-flexRow--shelf-main-hover-actions', { timeout: 30000 });
 
     const productosPagina = await page.evaluate(() => {
-      return Array.from(document.querySelectorAll('.vtex-flex-layout-0-x-flexRow--shelf-main-hover-actions'))
-        .map(card => {
-          const nombre = card.querySelector('.vtex-product-summary-2-x-productBrand')?.innerText.trim() || '';
-          const precio = card.querySelector('.vtex-product-price-1-x-sellingPriceValue')?.innerText.trim() || '';
-          const imagen = card.querySelector('img')?.src || '';
-          return { nombre, precio, imagen };
-        })
-        .filter(p => p.nombre);
-    });
+  return Array.from(document.querySelectorAll('.vtex-flex-layout-0-x-flexRow--shelf-main-hover-actions'))
+    .map(card => {
+      const nombre = card.querySelector('.vtex-product-summary-2-x-productBrand')?.innerText.trim() || '';
+      const precio = card.querySelector('.vtex-product-price-1-x-sellingPriceValue')?.innerText.trim() || '';
+      const imagen = card.querySelector('.vtex-product-summary-2-x-imageNormal')?.src || '';
+      return { nombre, precio, imagen };
+    })
+    .filter(p => p.nombre);
+});
+
 
     productos.push(...productosPagina);
 
