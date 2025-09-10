@@ -16,19 +16,31 @@ async function scrapearCoto() {
   const browser = await launchBrowser();
   const page = await browser.newPage();
 
-  await page.goto(
-    'https://www.cotodigital.com.ar/sitios/cdigi/categoria/ofertas-exclusivas/_/N-1nx2iz5%3FNf%3Dproduct.startDate%257CLTEQ%2B1.755648E12%257C%257Cproduct.endDate%257CGTEQ%2B1.755648E12&Nr%3DAND%2528product.sDisp_200%253A1004%252Cproduct.language%253Aespa%25C3%25B1ol%252COR%2528product.siteId%253ACotoDigital%2529%2529&pushSite%3DCotoDigital',
-    { waitUntil: 'networkidle0' }
+  await page.setUserAgent(
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
+    "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
   );
 
-  await page.waitForSelector('.nombre-producto.cursor-pointer', { timeout: 150000 });
+  await page.goto(
+    "https://www.cotodigital.com.ar/sitios/cdigi/categoria/ofertas-exclusivas/_/N-1nx2iz5...",
+    { waitUntil: "networkidle2", timeout: 0 }
+  );
+
+  try {
+    await page.waitForSelector(".nombre-producto.cursor-pointer", { timeout: 30000 });
+  } catch {
+    console.log("⚠️ No se encontraron productos en Coto (selector no apareció)");
+    await page.screenshot({ path: "coto_debug.png", fullPage: true });
+    await browser.close();
+    return;
+  }
 
   const productos = await page.evaluate(() => {
-    const tarjetas = document.querySelectorAll('.card-product'); // Ajusta según HTML real
+    const tarjetas = document.querySelectorAll(".card-product");
     return Array.from(tarjetas).map(card => {
-      const nombre = card.querySelector('.nombre-producto.cursor-pointer')?.innerText.trim() || '';
-      const precio = card.querySelector('.card-title.text-center.mt-1.m-0.p-0.ng-star-inserted')?.innerText.trim() || '';
-      const imagen = card.querySelector('img')?.src || '';
+      const nombre = card.querySelector(".nombre-producto.cursor-pointer")?.innerText.trim() || "";
+      const precio = card.querySelector(".card-title.text-center.mt-1.m-0.p-0.ng-star-inserted")?.innerText.trim() || "";
+      const imagen = card.querySelector("img")?.src || "";
       return { nombre, precio, imagen };
     }).filter(p => p.nombre);
   });
@@ -38,6 +50,7 @@ async function scrapearCoto() {
 
   await browser.close();
 }
+
 
 // Scrapping de Jumbo
 async function scrapearJumbo() {
