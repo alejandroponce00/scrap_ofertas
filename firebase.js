@@ -1,11 +1,16 @@
+import dotenv from "dotenv";
+dotenv.config();
+
 import admin from "firebase-admin";
 
 // ✅ Parsear credencial desde secret de GitHub
 if (!process.env.FIREBASE_SERVICE_ACCOUNT) {
   throw new Error("FIREBASE_SERVICE_ACCOUNT no está definido en las variables de entorno");
 }
+// filepath: /Users/alejandroponce/Desktop/proyectos/Scrap-Ofertas/scrap_ofertas-back/firebase.js
 
 const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+console.log("Valor de FIREBASE_SERVICE_ACCOUNT:", process.env.FIREBASE_SERVICE_ACCOUNT);
 
 // Arreglar saltos de línea de la private key
 if (serviceAccount.private_key) {

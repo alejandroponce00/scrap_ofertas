@@ -11,6 +11,8 @@ export async function guardarProductos(origen, productos) {
         origen, // Coto o Carrefour
         nombre: producto.nombre,
         precio: producto.precio,
+        imagen: producto.imagen || "",
+        url: producto.url || "", // <-- Agregado
         fecha: new Date().toISOString()
       });
     });
@@ -49,7 +51,9 @@ export async function buscarProductos(q) {
           nombre: data.nombre,
           precio: data.precio,
           origen: data.origen,
-          fecha: data.fecha
+          fecha: data.fecha,
+          imagen: data.imagen || "",
+          url: data.url || ""
         });
       }
     });
