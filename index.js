@@ -117,7 +117,6 @@ async function scrapearStockCenter() {
   } catch (e) {
     // Si no aparece, continuar
   }
-// Agregar después de línea 101 (antes del waitForSelector)
 
   // Esperar a que carguen los productos
   await page.waitForSelector('.product-tile', { timeout: isDev ? 60000 : 30000 });
@@ -258,70 +257,6 @@ async function scrapearOpenSports() {
   } catch (e) {
     // Si no aparece, continuar
   }
-
-  // Debug: probar varios selectores para OpenSports (comentado)
-  /*
-  const debugSelectors = [
-    '.product-item-info',
-    '.product-item',
-    '.product-card',
-    '[class*="product"]',
-    '[class*="item"]'
-  ];
-
-  console.log("Probando selectores para OpenSports...");
-  for (const selector of debugSelectors) {
-    try {
-      const count = await page.evaluate((sel) => {
-        return document.querySelectorAll(sel).length;
-      }, selector);
-      console.log(`Selector "${selector}": ${count} elementos`);
-    } catch (e) {
-      console.log(`Selector "${selector}": Error - ${e.message}`);
-    }
-  }
-
-  // Debug: probar contenedores más amplios para OpenSports (comentado)
-  const containerSelectors = [
-    '.product-item-info',
-    '.product-item',
-    '.item',
-    '[class*="product-item"]',
-    '[class*="product"][class*="item"]'
-  ];
-
-  console.log("Probando contenedores para OpenSports...");
-  let bestSelector = '.product-item-info';
-  let maxElements = 0;
-
-  for (const selector of containerSelectors) {
-    try {
-      const count = await page.evaluate((sel) => {
-        return document.querySelectorAll(sel).length;
-      }, selector);
-      console.log(`Contenedor "${selector}": ${count} elementos`);
-      
-      // Verificar si este contenedor tiene nombre y precio
-      if (count > 0) {
-        const hasData = await page.evaluate((sel) => {
-          const first = document.querySelector(sel);
-          if (!first) return false;
-          return first.querySelector('.product-item-link') || first.querySelector('.price') || first.querySelector('[class*="name"]');
-        }, selector);
-        console.log(`Contenedor "${selector}" tiene datos: ${hasData}`);
-        
-        if (count > maxElements && hasData) {
-          maxElements = count;
-          bestSelector = selector;
-        }
-      }
-    } catch (e) {
-      console.log(`Contenedor "${selector}": Error - ${e.message}`);
-    }
-  }
-
-  console.log(`Mejor selector: ${bestSelector} con ${maxElements} elementos`);
-  */
   
   // Usar el selector que funciona para OpenSports
   const bestSelector = '[class*="product-item"]';
@@ -333,7 +268,6 @@ async function scrapearOpenSports() {
   let previousHeight = 0;
   let sameCount = 0;
   let maxProductos = 100;
-  // console.log("Iniciando scroll suave para cargar más productos...");
   
   for (let i = 0; i < 30; i++) {
     const currentHeight = await page.evaluate('document.body.scrollHeight');
@@ -345,46 +279,30 @@ async function scrapearOpenSports() {
       await new Promise(r => setTimeout(r, 800)); // Espera entre cada paso
     }
     
-    // console.log(`Scroll ${i+1}: Altura actual: ${currentHeight}`);
-    
     // Esperar más tiempo después del scroll completo
     await new Promise(r => setTimeout(r, 3000));
     const newCount = await page.evaluate((sel) => document.querySelectorAll(sel).length, bestSelector);
-    // console.log(`Scroll ${i+1}: Productos encontrados: ${newCount}`);
+    
     if (newCount >= maxProductos) {
-      // console.log(`Se alcanzó el máximo de ${maxProductos} productos`);
       break;
     }
     if (newCount === previousHeight) {
       sameCount++;
-      // console.log(`No se encontraron nuevos productos (contador: ${sameCount})`);
       if (sameCount > 2) {
-        // console.log("No hay más productos, terminando scroll");
         break;
       }
     } else {
       sameCount = 0;
-      // console.log(`Se encontraron ${newCount - previousHeight} productos nuevos`);
     }
     previousHeight = newCount;
   }
 
-  // Esperar final más larga para que se carguen todos los productos completamente
-  // console.log("Espera final antes de extraer datos...");
+  // Espera final antes de extraer datos
   await new Promise(r => setTimeout(r, 5000));
 
-  // Debug: obtener HTML completo del primer card antes del mapeo (comentado)
-  /*
-  const primerCardHTML = await page.evaluate((sel) => {
+  // Extraer productos RAW (sin procesar URLs de Next.js todavía)
+  const productosRaw = await page.evaluate((sel) => {
     const cards = document.querySelectorAll(sel);
-    return cards[0]?.innerHTML || "";
-  }, bestSelector);
-  console.log("HTML completo del primer card:", primerCardHTML);
-  */
-
-  const productos = await page.evaluate((sel) => {
-    const cards = document.querySelectorAll(sel);
-    // console.log(`Cards encontrados: ${cards.length}`);
     
     return Array.from(cards).slice(0, 100).map((card, index) => {
       // Extraer nombre y enlace de OpenSports - buscar en todo el card
@@ -412,66 +330,74 @@ async function scrapearOpenSports() {
                      card.querySelector('img[src]');
       let imagen = "";
       if (imgEl) {
-        // Función auxiliar para extraer la URL real de la imagen de una URL de Next.js
-        const extractRealImageUrl = (nextImageUrl) => {
-          try {
-            const urlObj = new URL(nextImageUrl, 'https://www.opensports.com.ar');
-            const imageUrlParam = urlObj.searchParams.get('url');
-            if (imageUrlParam) {
-              return decodeURIComponent(imageUrlParam);
-            }
-          } catch (e) {
-            console.error("Error al parsear URL de Next.js:", e);
-          }
-          return nextImageUrl;
-        };
-
-        // Prioridad: data-src > srcset > src
-        imagen = imgEl.getAttribute('data-src') || '';
-        if (imagen.includes('/next/image')) imagen = extractRealImageUrl(imagen);
+        // Prioridad: data-src > data-lazy-src > srcset > src
+        imagen = imgEl.getAttribute('data-src') || 
+                 imgEl.getAttribute('data-lazy-src') ||
+                 '';
         
         // Si no hay data-src, procesar srcset
         if (!imagen && imgEl.getAttribute('srcset')) {
           const srcset = imgEl.getAttribute('srcset');
-          // Tomar la primera imagen del srcset (la más pequeña)
-          const firstImage = srcset?.split(',')[0]?.trim();
+          // Tomar la primera imagen del srcset
+          const firstImage = srcset?.split(',')[0]?.trim().split(' ')[0];
           if (firstImage) {
-            // Extraer URL del srcset (formato: "url tamaño")
-            const urlMatch = firstImage.match(/https?:\/\/[^\s]+/);
-            if (urlMatch) {
-              imagen = urlMatch[0];
-              if (imagen.includes('/next/image')) imagen = extractRealImageUrl(imagen);
-            } else {
-              // Si no coincide con https, podría ser una ruta relativa de Next.js
-              const nextImageUrlMatch = firstImage.match(/(\/next\/image\?url=[^\s]+)/);
-              if (nextImageUrlMatch) {
-                imagen = extractRealImageUrl(nextImageUrlMatch[0]);
-              }
-            }
+            imagen = firstImage;
           }
         }
         
         // Fallback a src si todavía no hay imagen
         if (!imagen) {
           imagen = imgEl.getAttribute('src') || '';
-          if (imagen.includes('/next/image')) imagen = extractRealImageUrl(imagen);
         }
         
-        if (imagen.startsWith('/')) imagen = 'https://www.opensports.com.ar' + imagen;
+        // Limpiar URLs relativas
+        if (imagen.startsWith('//')) {
+          imagen = 'https:' + imagen;
+        } else if (imagen.startsWith('/')) {
+          imagen = 'https://www.opensports.com.ar' + imagen;
+        }
       }
 
       return { nombre, precio, imagen, url };
     });
   }, bestSelector);
 
-  // Debug: mostrar resultados antes del filtro (comentado)
-  // console.log(`Productos extraídos: ${productos.length}`);
-  // console.log(`Primer producto:`, productos[0]);
+  // Procesar URLs de Next.js FUERA del evaluate (en contexto de Node.js)
+  const productos = productosRaw.map(p => {
+    let imagen = p.imagen;
+    
+    // Extraer URL real si es de Next.js
+    if (imagen && imagen.includes('/next/image')) {
+      try {
+        const urlObj = new URL(imagen, 'https://www.opensports.com.ar');
+        const imageUrlParam = urlObj.searchParams.get('url');
+        if (imageUrlParam) {
+          imagen = decodeURIComponent(imageUrlParam);
+          // Asegurar que sea URL completa
+          if (imagen.startsWith('/')) {
+            imagen = 'https://www.opensports.com.ar' + imagen;
+          }
+        }
+      } catch (e) {
+        console.error("Error procesando URL de Next.js:", e);
+      }
+    }
+    
+    return { ...p, imagen };
+  });
 
   const productosFiltrados = productos.filter(p => p.nombre && p.imagen && p.url);
-  // console.log(`Productos después del filtro: ${productosFiltrados.length}`);
 
   console.log(`Se encontraron ${productosFiltrados.length} productos en OpenSports`);
+  
+  // Debug: mostrar primeros 3 productos para verificar las imágenes
+  console.log("Primeros 3 productos de OpenSports:");
+  productosFiltrados.slice(0, 3).forEach((p, i) => {
+    console.log(`${i + 1}. ${p.nombre}`);
+    console.log(`   Imagen: ${p.imagen}`);
+    console.log(`   Precio: ${p.precio}`);
+  });
+  
   await guardarProductos("OpenSports", productosFiltrados);
 
   await browser.close();
@@ -479,7 +405,7 @@ async function scrapearOpenSports() {
 
 // Ejecutar scrapper de Solo Deportes, Stock Center y OpenSports
 async function main() {
- await scrapearSoloDeportes();
+  await scrapearSoloDeportes();
   await scrapearStockCenter();
   await scrapearOpenSports();
 }
