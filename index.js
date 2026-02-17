@@ -68,7 +68,8 @@ async function scrapearSoloDeportes() {
         '[class*="product"]': document.querySelectorAll('[class*="product"]').length,
         '[class*="card"]': document.querySelectorAll('[class*="card"]').length,
         '[class*="tile"]': document.querySelectorAll('[class*="tile"]').length,
-        '[data-*]': document.querySelectorAll('[data-*]').length,
+        '[data-test]': document.querySelectorAll('[data-test]').length,
+        '[data-id]': document.querySelectorAll('[data-id]').length,
       };
       
       // 4. Verificar si hay modales o overlays
