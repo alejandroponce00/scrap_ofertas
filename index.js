@@ -546,9 +546,6 @@ async function main() {
   await scrapearSoloDeportes();
   await scrapearStockCenter();
   await scrapearOpenSports();
-  
-  // Guardar fecha de última actualización
-  await guardarUltimaActualizacion();
 }
 
 main();
