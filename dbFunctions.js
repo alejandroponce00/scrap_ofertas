@@ -44,8 +44,53 @@ export async function guardarProductos(origen, productos) {
     });
     await batch.commit();
     console.log(`✅ Guardados ${productos.length} productos de ${origen} en Firestore`);
+    
+    // Guardar la fecha de actualización
+    await guardarUltimaActualizacion();
   } catch (error) {
     console.error("❌ Error guardando en Firestore:", error);
+  }
+}
+
+// Guardar fecha de última actualización
+export async function guardarUltimaActualizacion() {
+  try {
+    const docRef = db.collection("metadata").doc("ultima_actualizacion");
+    await docRef.set({
+      fecha: new Date().toISOString(),
+      timestamp: new Date().getTime()
+    });
+    console.log("✅ Fecha de última actualización guardada");
+  } catch (error) {
+    console.error("❌ Error guardando fecha de actualización:", error);
+  }
+}
+
+// Obtener fecha de última actualización
+export async function obtenerUltimaActualizacion() {
+  try {
+    const doc = await db.collection("metadata").doc("ultima_actualizacion").get();
+    if (doc.exists) {
+      const data = doc.data();
+      return { fecha: data.fecha };
+    }
+    
+    // Si no hay metadata, intentar obtener la fecha del producto más reciente
+    const snapshot = await db.collection("productos")
+      .orderBy("fecha", "desc")
+      .limit(1)
+      .get();
+    
+    if (!snapshot.empty) {
+      const ultimoProducto = snapshot.docs[0].data();
+      return { fecha: ultimoProducto.fecha };
+    }
+    
+    // Si no hay productos, devolver fecha nula
+    return { fecha: null };
+  } catch (error) {
+    console.error("❌ Error obteniendo fecha de actualización:", error);
+    return { fecha: null };
   }
 }
 

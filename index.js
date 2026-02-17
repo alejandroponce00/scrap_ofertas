@@ -1,5 +1,5 @@
 import puppeteer from "puppeteer";
-import { guardarProductos } from "./dbFunctions.js";
+import { guardarProductos, guardarUltimaActualizacion } from "./dbFunctions.js";
 
 // Detectar entorno de desarrollo o producción
 const isDev = process.env.NODE_ENV !== "production";
@@ -546,6 +546,9 @@ async function main() {
   await scrapearSoloDeportes();
   await scrapearStockCenter();
   await scrapearOpenSports();
+  
+  // Guardar fecha de última actualización
+  await guardarUltimaActualizacion();
 }
 
 main();
