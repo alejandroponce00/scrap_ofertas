@@ -38,7 +38,11 @@ async function scrapearSoloDeportes() {
         '.product',
         'article',
         '.tile',
-        '[class*="tile"]'
+        '[class*="tile"]',
+        '.product-item-link',
+        'a[href*="/product"]',
+        '.price',
+        '[class*="price"]'
       ];
       
       const results = {};
@@ -61,70 +65,113 @@ async function scrapearSoloDeportes() {
     console.log("Resultados de debug:", JSON.stringify(debugInfo, null, 2));
   }
 
-  // Esperar a que carguen los productos con múltiples selectores de fallback
+  // Esperar a que carguen los productos con selectores específicos para Solo Deportes
   let productos = [];
   const selectors = [
     '.product-item-info', 
-    '.product-item', 
-    '.product-card', 
+    '.product-item-link',
+    'a[href*="/product"]',
     '[class*="product-item"]',
     '[class*="product"]',
-    '[class*="item"]',
-    '.item',
-    'li[class*="item"]',
-    'div[class*="product"]',
     '.product',
     'article',
-    '.tile',
-    '[class*="tile"]'
+    '.tile'
   ];
   
   for (const selector of selectors) {
     try {
       await page.waitForSelector(selector, { timeout: isDev ? 30000 : 10000 });
-      productos = await page.evaluate((sel) => {
-        const cards = document.querySelectorAll(sel);
-        return Array.from(cards).slice(0, 100).map(card => {
-          const linkEl = card.querySelector('.product-item-link') || 
-                        card.querySelector('a[href*="/product"]') ||
-                        card.querySelector('a') ||
-                        card.querySelector('[href]');
-          const nombre = linkEl?.innerText.trim() || card.querySelector('[class*="name"]')?.innerText.trim() || "";
-          let url = linkEl?.getAttribute('href') || "";
-          if (url.startsWith('/')) url = 'https://www.solodeportes.com.ar' + url;
-
-          const precio = card.querySelector('.price')?.innerText.trim() || 
-                        card.querySelector('[class*="price"]')?.innerText.trim() || "";
-
-          // Imagen: buscar cualquier img
-          const imgEl = card.querySelector('img[data-src]') || card.querySelector('img[src]') || card.querySelector('img');
-          let imagen = "";
-          if (imgEl) {
-            // Función auxiliar para extraer la URL real de la imagen de una URL de Next.js
-            const extractRealImageUrl = (nextImageUrl, baseUrl) => {
-              try {
-                const urlObj = new URL(nextImageUrl, baseUrl);
-                const imageUrlParam = urlObj.searchParams.get('url');
-                if (imageUrlParam) {
-                  return decodeURIComponent(imageUrlParam);
+      
+      // Si es un enlace, buscar el contenedor padre
+      if (selector === '.product-item-link' || selector === 'a[href*="/product"]') {
+        productos = await page.evaluate((sel) => {
+          const links = document.querySelectorAll(sel);
+          return Array.from(links).slice(0, 100).map(link => {
+            const nombre = link.innerText.trim() || "";
+            let url = link.getAttribute('href') || "";
+            if (url.startsWith('/')) url = 'https://www.solodeportes.com.ar' + url;
+            
+            // Buscar precio en el contenedor padre
+            const parent = link.closest('div') || link.closest('li') || link.closest('article');
+            const precio = parent?.querySelector('.price')?.innerText.trim() || 
+                          parent?.querySelector('[class*="price"]')?.innerText.trim() || "";
+            
+            // Buscar imagen en el contenedor padre
+            const imgEl = parent?.querySelector('img[data-src]') || 
+                         parent?.querySelector('img[src]') || 
+                         parent?.querySelector('img');
+            let imagen = "";
+            if (imgEl) {
+              const extractRealImageUrl = (nextImageUrl, baseUrl) => {
+                try {
+                  const urlObj = new URL(nextImageUrl, baseUrl);
+                  const imageUrlParam = urlObj.searchParams.get('url');
+                  if (imageUrlParam) {
+                    return decodeURIComponent(imageUrlParam);
+                  }
+                } catch (e) {
+                  console.error("Error al parsear URL de Next.js:", e);
                 }
-              } catch (e) {
-                console.error("Error al parsear URL de Next.js:", e);
+                return nextImageUrl;
+              };
+
+              imagen = imgEl.getAttribute('data-src') || imgEl.getAttribute('src') || "";
+              if (imagen.includes('/next/image')) {
+                imagen = extractRealImageUrl(imagen, 'https://www.solodeportes.com.ar');
               }
-              return nextImageUrl;
-            };
-
-            imagen = imgEl.getAttribute('data-src') || imgEl.getAttribute('src') || "";
-            if (imagen.includes('/next/image')) {
-              imagen = extractRealImageUrl(imagen, 'https://www.solodeportes.com.ar');
+              if (imagen.startsWith('//')) imagen = 'https:' + imagen;
+              if (imagen.startsWith('/')) imagen = 'https://www.solodeportes.com.ar' + imagen;
             }
-            if (imagen.startsWith('//')) imagen = 'https:' + imagen;
-            if (imagen.startsWith('/')) imagen = 'https://www.solodeportes.com.ar' + imagen;
-          }
 
-          return { nombre, precio, imagen, url };
-        }).filter(p => p.nombre && p.imagen && p.url);
-      }, selector);
+            return { nombre, precio, imagen, url };
+          }).filter(p => p.nombre && p.imagen && p.url);
+        }, selector);
+      } else {
+        // Para contenedores de productos
+        productos = await page.evaluate((sel) => {
+          const cards = document.querySelectorAll(sel);
+          return Array.from(cards).slice(0, 100).map(card => {
+            const linkEl = card.querySelector('.product-item-link') || 
+                          card.querySelector('a[href*="/product"]') ||
+                          card.querySelector('a') ||
+                          card.querySelector('[href]');
+            const nombre = linkEl?.innerText.trim() || 
+                          card.querySelector('[class*="name"]')?.innerText.trim() || "";
+            let url = linkEl?.getAttribute('href') || "";
+            if (url.startsWith('/')) url = 'https://www.solodeportes.com.ar' + url;
+
+            const precio = card.querySelector('.price')?.innerText.trim() || 
+                          card.querySelector('[class*="price"]')?.innerText.trim() || "";
+
+            // Imagen: buscar cualquier img
+            const imgEl = card.querySelector('img[data-src]') || card.querySelector('img[src]') || card.querySelector('img');
+            let imagen = "";
+            if (imgEl) {
+              const extractRealImageUrl = (nextImageUrl, baseUrl) => {
+                try {
+                  const urlObj = new URL(nextImageUrl, baseUrl);
+                  const imageUrlParam = urlObj.searchParams.get('url');
+                  if (imageUrlParam) {
+                    return decodeURIComponent(imageUrlParam);
+                  }
+                } catch (e) {
+                  console.error("Error al parsear URL de Next.js:", e);
+                }
+                return nextImageUrl;
+              };
+
+              imagen = imgEl.getAttribute('data-src') || imgEl.getAttribute('src') || "";
+              if (imagen.includes('/next/image')) {
+                imagen = extractRealImageUrl(imagen, 'https://www.solodeportes.com.ar');
+              }
+              if (imagen.startsWith('//')) imagen = 'https:' + imagen;
+              if (imagen.startsWith('/')) imagen = 'https://www.solodeportes.com.ar' + imagen;
+            }
+
+            return { nombre, precio, imagen, url };
+          }).filter(p => p.nombre && p.imagen && p.url);
+        }, selector);
+      }
       
       if (productos.length > 0) {
         console.log(`Se encontraron ${productos.length} productos con selector: ${selector}`);
