@@ -21,25 +21,83 @@ async function scrapearSoloDeportes() {
 
   await page.goto("https://www.solodeportes.com.ar/ofertas.html", { waitUntil: "networkidle2", timeout: isDev ? 60000 : 45000 });
 
+  // Debug: descubrir qué elementos existen en la página
+  if (isGithub) {
+    console.log("Debug: Analizando estructura de Solo Deportes...");
+    const debugInfo = await page.evaluate(() => {
+      const selectors = [
+        '.product-item-info',
+        '.product-item', 
+        '.product-card',
+        '[class*="product-item"]',
+        '[class*="product"]',
+        '[class*="item"]',
+        '.item',
+        'li[class*="item"]',
+        'div[class*="product"]',
+        '.product',
+        'article',
+        '.tile',
+        '[class*="tile"]'
+      ];
+      
+      const results = {};
+      selectors.forEach(sel => {
+        try {
+          const elements = document.querySelectorAll(sel);
+          results[sel] = elements.length;
+          if (elements.length > 0 && elements.length < 10) {
+            // Mostrar HTML del primer elemento para análisis
+            results[sel + '_html'] = elements[0].outerHTML.substring(0, 200);
+          }
+        } catch (e) {
+          results[sel] = 'Error: ' + e.message;
+        }
+      });
+      
+      return results;
+    });
+    
+    console.log("Resultados de debug:", JSON.stringify(debugInfo, null, 2));
+  }
+
   // Esperar a que carguen los productos con múltiples selectores de fallback
   let productos = [];
-  const selectors = ['.product-item-info', '.product-item', '.product-card', '[class*="product-item"]'];
+  const selectors = [
+    '.product-item-info', 
+    '.product-item', 
+    '.product-card', 
+    '[class*="product-item"]',
+    '[class*="product"]',
+    '[class*="item"]',
+    '.item',
+    'li[class*="item"]',
+    'div[class*="product"]',
+    '.product',
+    'article',
+    '.tile',
+    '[class*="tile"]'
+  ];
   
   for (const selector of selectors) {
     try {
-      await page.waitForSelector(selector, { timeout: isDev ? 30000 : 15000 });
+      await page.waitForSelector(selector, { timeout: isDev ? 30000 : 10000 });
       productos = await page.evaluate((sel) => {
         const cards = document.querySelectorAll(sel);
         return Array.from(cards).slice(0, 100).map(card => {
-          const linkEl = card.querySelector('.product-item-link');
-          const nombre = linkEl?.innerText.trim() || "";
+          const linkEl = card.querySelector('.product-item-link') || 
+                        card.querySelector('a[href*="/product"]') ||
+                        card.querySelector('a') ||
+                        card.querySelector('[href]');
+          const nombre = linkEl?.innerText.trim() || card.querySelector('[class*="name"]')?.innerText.trim() || "";
           let url = linkEl?.getAttribute('href') || "";
           if (url.startsWith('/')) url = 'https://www.solodeportes.com.ar' + url;
 
-          const precio = card.querySelector('.price')?.innerText.trim() || "";
+          const precio = card.querySelector('.price')?.innerText.trim() || 
+                        card.querySelector('[class*="price"]')?.innerText.trim() || "";
 
-          // Imagen: buscar cualquier .product-image-photo
-          const imgEl = card.querySelector('img[data-src]') || card.querySelector('img[src]');
+          // Imagen: buscar cualquier img
+          const imgEl = card.querySelector('img[data-src]') || card.querySelector('img[src]') || card.querySelector('img');
           let imagen = "";
           if (imgEl) {
             // Función auxiliar para extraer la URL real de la imagen de una URL de Next.js
