@@ -1,9 +1,35 @@
 // dbFunctions.js
 import { db } from "./firebase.js"; // firebase-admin
 
+// Borrar productos por origen antes de guardar nuevos
+export async function borrarProductosPorOrigen(origen) {
+  try {
+    const snapshot = await db.collection("productos").where("origen", "==", origen).get();
+    if (snapshot.empty) {
+      console.log(`📝 No hay productos para borrar de ${origen}`);
+      return 0;
+    }
+    
+    const batch = db.batch();
+    snapshot.forEach((doc) => {
+      batch.delete(doc.ref);
+    });
+    
+    await batch.commit();
+    console.log(`🗑️ Borrados ${snapshot.size} productos de ${origen} de Firestore`);
+    return snapshot.size;
+  } catch (error) {
+    console.error(`❌ Error borrando productos de ${origen}:`, error);
+    return 0;
+  }
+}
+
 // Guardar productos en Firestore
 export async function guardarProductos(origen, productos) {
   try {
+    // Primero borrar los productos existentes de este origen
+    await borrarProductosPorOrigen(origen);
+    
     const batch = db.batch(); // permite múltiples escrituras
     productos.forEach((producto) => {
       const docRef = db.collection("productos").doc(); // ID automático

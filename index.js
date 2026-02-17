@@ -19,50 +19,79 @@ async function scrapearSoloDeportes() {
   const browser = await launchBrowser();
   const page = await browser.newPage();
 
-  await page.goto("https://www.solodeportes.com.ar/ofertas.html", { waitUntil: "networkidle2", timeout: isDev ? 60000 : 45000 });
+  // Aumentar timeout para GitHub Actions
+  const timeout = isGithub ? 90000 : 45000; // 90s en GitHub, 45s local
+  
+  await page.goto("https://www.solodeportes.com.ar/ofertas.html", { 
+    waitUntil: "networkidle2", 
+    timeout 
+  });
 
-  // Debug: descubrir qué elementos existen en la página
+  // Esperar extra en GitHub Actions para carga dinámica
   if (isGithub) {
-    console.log("Debug: Analizando estructura de Solo Deportes...");
-    const debugInfo = await page.evaluate(() => {
-      const selectors = [
-        '.product-item-info',
-        '.product-item', 
-        '.product-card',
-        '[class*="product-item"]',
-        '[class*="product"]',
-        '[class*="item"]',
-        '.item',
-        'li[class*="item"]',
-        'div[class*="product"]',
-        '.product',
-        'article',
-        '.tile',
-        '[class*="tile"]',
-        '.product-item-link',
-        'a[href*="/product"]',
-        '.price',
-        '[class*="price"]'
-      ];
+    console.log("Esperando carga dinámica en GitHub Actions...");
+    await new Promise(r => setTimeout(r, 10000)); // 10s extra
+    
+    // Intentar scroll para activar carga lazy
+    await page.evaluate('window.scrollTo(0, document.body.scrollHeight)');
+    await new Promise(r => setTimeout(r, 5000)); // 5s después del scroll
+    
+    await page.evaluate('window.scrollTo(0, 0)');
+    await new Promise(r => setTimeout(r, 3000)); // 3s después de volver arriba
+  }
+
+  // Debug: analizar estado completo de la página
+  if (isGithub) {
+    console.log("Debug: Analizando estado completo de Solo Deportes...");
+    
+    const pageAnalysis = await page.evaluate(() => {
+      // 1. Verificar si hay contenido en la página
+      const bodyContent = document.body.innerText.length;
+      const allElements = document.querySelectorAll('*').length;
+      const allLinks = document.querySelectorAll('a').length;
+      const allImages = document.querySelectorAll('img').length;
       
-      const results = {};
-      selectors.forEach(sel => {
-        try {
-          const elements = document.querySelectorAll(sel);
-          results[sel] = elements.length;
-          if (elements.length > 0 && elements.length < 10) {
-            // Mostrar HTML del primer elemento para análisis
-            results[sel + '_html'] = elements[0].outerHTML.substring(0, 200);
-          }
-        } catch (e) {
-          results[sel] = 'Error: ' + e.message;
-        }
-      });
+      // 2. Buscar cualquier texto que parezca producto
+      const productKeywords = ['$', 'precio', 'oferta', 'descuento', 'product', 'item'];
+      const textContent = document.body.innerText.toLowerCase();
+      const hasProductKeywords = productKeywords.some(keyword => textContent.includes(keyword));
       
-      return results;
+      // 3. Buscar selectores genéricos que puedan existir
+      const genericSelectors = {
+        'div': document.querySelectorAll('div').length,
+        'li': document.querySelectorAll('li').length,
+        'article': document.querySelectorAll('article').length,
+        'section': document.querySelectorAll('section').length,
+        'a': document.querySelectorAll('a').length,
+        'img': document.querySelectorAll('img').length,
+        '[class*="item"]': document.querySelectorAll('[class*="item"]').length,
+        '[class*="product"]': document.querySelectorAll('[class*="product"]').length,
+        '[class*="card"]': document.querySelectorAll('[class*="card"]').length,
+        '[class*="tile"]': document.querySelectorAll('[class*="tile"]').length,
+        '[data-*]': document.querySelectorAll('[data-*]').length,
+      };
+      
+      // 4. Verificar si hay modales o overlays
+      const modals = document.querySelectorAll('.modal, .popup, .overlay, [class*="modal"], [class*="popup"], [class*="overlay"]').length;
+      
+      // 5. Verificar el título de la página
+      const pageTitle = document.title;
+      
+      return {
+        bodyContent,
+        allElements,
+        allLinks,
+        allImages,
+        hasProductKeywords,
+        genericSelectors,
+        modals,
+        pageTitle,
+        url: window.location.href,
+        readyState: document.readyState
+      };
     });
     
-    console.log("Resultados de debug:", JSON.stringify(debugInfo, null, 2));
+    console.log("Análisis completo de la página:", JSON.stringify(pageAnalysis, null, 2));
   }
 
   // Esperar a que carguen los productos con selectores específicos para Solo Deportes
@@ -78,9 +107,12 @@ async function scrapearSoloDeportes() {
     '.tile'
   ];
   
+  // Timeout más largo para GitHub Actions
+  const selectorTimeout = isGithub ? 30000 : 10000;
+  
   for (const selector of selectors) {
     try {
-      await page.waitForSelector(selector, { timeout: isDev ? 30000 : 10000 });
+      await page.waitForSelector(selector, { timeout: selectorTimeout });
       
       // Si es un enlace, buscar el contenedor padre
       if (selector === '.product-item-link' || selector === 'a[href*="/product"]') {
